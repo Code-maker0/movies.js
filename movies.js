@@ -1,15 +1,33 @@
 // Replace with your TMDB API key
 const apiKey = 'b31550cf1a6a31c5eb1fe12f3afc44f0';
-const proxyUrl = 'https://cors-anywhere.herokuapp.com/'; // CORS proxy
 let currentPage = 1;
 let totalPages = 1;
 let currentGenre = '';
 
-// Fetch genres from TMDB
-async function fetchGenres() {
-  const url = `${proxyUrl}https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=en-US`;
-  const response = await fetch(url);
-  const data = await response.json();
+// Function to make JSONP requests
+function jsonp(url, callback) {
+  const script = document.createElement('script');
+  script.src = url;
+  script.onload = () => script.remove();
+  script.onerror = () => {
+    script.remove();
+    console.error('JSONP request failed');
+  };
+  window[callback] = (data) => {
+    delete window[callback];
+    callback(data);
+  };
+  document.body.appendChild(script);
+}
+
+// Fetch genres from TMDB using JSONP
+function fetchGenres() {
+  const url = `https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=en-US&callback=handleGenres`;
+  jsonp(url, 'handleGenres');
+}
+
+// Handle genres response
+function handleGenres(data) {
   const genreSelect = document.getElementById('genre-filter');
   data.genres.forEach(genre => {
     const option = document.createElement('option');
@@ -19,13 +37,16 @@ async function fetchGenres() {
   });
 }
 
-// Fetch movies from TMDB
-async function fetchMovies(page = 1, genre = '') {
+// Fetch movies from TMDB using JSONP
+function fetchMovies(page = 1, genre = '') {
   const url = genre
-    ? `${proxyUrl}https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=en-US&page=${page}&with_genres=${genre}`
-    : `${proxyUrl}https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=en-US&page=${page}`;
-  const response = await fetch(url);
-  const data = await response.json();
+    ? `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=en-US&page=${page}&with_genres=${genre}&callback=handleMovies`
+    : `https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=en-US&page=${page}&callback=handleMovies`;
+  jsonp(url, 'handleMovies');
+}
+
+// Handle movies response
+function handleMovies(data) {
   totalPages = data.total_pages;
   displayMovies(data.results);
   updatePagination();
@@ -50,10 +71,13 @@ function displayMovies(movies) {
 }
 
 // Show trailer
-async function showTrailer(movieId) {
-  const url = `${proxyUrl}https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${apiKey}&language=en-US`;
-  const response = await fetch(url);
-  const data = await response.json();
+function showTrailer(movieId) {
+  const url = `https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${apiKey}&language=en-US&callback=handleTrailer`;
+  jsonp(url, 'handleTrailer');
+}
+
+// Handle trailer response
+function handleTrailer(data) {
   const trailer = data.results.find(video => video.type === 'Trailer');
   if (trailer) {
     window.open(`https://www.youtube.com/watch?v=${trailer.key}`, '_blank');
@@ -90,16 +114,14 @@ function filterByGenre() {
 }
 
 // Search movies
-async function searchMovie() {
+function searchMovie() {
   const query = document.getElementById('movie-search').value;
   if (!query) {
     alert('Please enter a movie title!');
     return;
   }
-  const url = `${proxyUrl}https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}`;
-  const response = await fetch(url);
-  const data = await response.json();
-  displayMovies(data.results);
+  const url = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&callback=handleMovies`;
+  jsonp(url, 'handleMovies');
 }
 
 // Initialize
